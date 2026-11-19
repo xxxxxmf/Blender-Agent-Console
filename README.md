@@ -2,7 +2,7 @@ Agent Console Bridge v0.2.0 发布说明
 简介
 Agent Console Bridge 是一个 Blender 侧栏插件 + 本地桥接服务。它让你可以用一句中文指令驱动本地 AI agent 在 Blender 里建模、改材质、调场景。模型每想一步就立刻执行一步，思考过程和执行结果实时显示在对话列表里，每一步都带独立撤销点。
 
-项目地址：[待填写 GitHub 仓库地址]
+项目地址：[(https://github.com/xxxxxmf/Blender-Agent-Console)]
 
 v0.2.0 更新亮点
 通用本地 agent 适配器：不再绑定 CodeBuddy CLI。通过 command_template 可接入 Claude Code、Cursor CLI 或任何能从命令行调用、按约定格式输出的本地 agent。
