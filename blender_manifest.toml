@@ -1,0 +1,24 @@
+schema_version = "1.0.0"
+
+id = "agent_console_bridge"
+version = "0.2.1"
+name = "Agent Console Bridge"
+tagline = "Natural-language Blender control through a local CodeBuddy agent"
+description = """Send natural-language instructions from Blender's sidebar to a local Python bridge.
+The bridge calls CodeBuddy CLI, streams the model's reasoning, and applies generated bpy patches
+step by step with individual undo steps.
+
+This extension requires CodeBuddy CLI to be installed and logged in, plus the bridge service
+shipped in the `bridge/` folder of this package to be running locally."""
+
+author = "Agent Console Bridge contributors"
+license = ["MIT"]
+blender_version_min = "4.2.0"
+
+tags = ["Scene", "Developer", "Scripting"]
+
+platforms = ["Windows", "Linux", "macOS"]
+
+[permissions]
+network = "The bridge calls CodeBuddy CLI, which communicates with a model service."
+files = "Reads/writes request, response, steps and heartbeat files in the shared directory."

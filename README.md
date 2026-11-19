@@ -1,67 +1,90 @@
-# Agent Console Bridge v0.2.1 发布说明
+# Agent Console Bridge
 
-## 简介
+A Blender add-on plus a tiny local bridge that lets you control Blender with natural language through the CodeBuddy CLI. The model streams its reasoning, the bridge splits it into individual `.py` steps, and Blender applies each step immediately with its own undo entry.
 
-Agent Console Bridge 是一个 Blender 侧栏插件 + 本地桥接服务。它让你可以用一句中文指令驱动本地 AI agent 在 Blender 里建模、改材质、调场景。模型每想一步就立刻执行一步，思考过程和执行结果实时显示在对话列表里，每一步都带独立撤销点。
+> This is a developer tool. It generates and executes arbitrary `bpy` code. Use it on disposable or backed-up `.blend` files.
 
-项目地址：[待填写 GitHub 仓库地址]
+## Features
 
-## v0.2.1 更新亮点
+- Step-by-step execution: the model thinks and acts one step at a time; you see each action as it happens.
+- Scrollable chat panel in the Blender sidebar with connection indicator.
+- Scene context sent with every request: selected objects, full object list, materials, collections, viewport screenshot.
+- Independent heartbeat thread and single-instance lock so the "bridge online" indicator stays accurate.
+- **Pause / resume button**: stop generation at any time; the bridge keeps draining the model stream without applying steps, then resumes exactly where it left off.
+- All shared files are written atomically with retry, so Windows file contention never interrupts a request.
+- Only local CLI connection is exposed in the panel; any CLI agent can be wired through the generic adapter.
+- No third-party Python packages; the bridge uses only the standard library.
 
-- 新增**暂停 / 继续生成**按钮：暂停时桥接继续读取模型输出但不应用步骤，恢复后从断点继续。
-- 修复 `steps.json` 等共享文件在 Windows 下被插件读取时写入抛 `PermissionError` 的问题：所有写入改为唯一临时文件 + 原子替换 + 重试，失败只跳过本次进度，不再中断请求。
-- 连接面板只保留本地 CLI 入口；其他智能体统一通过 `bridge/config.json` 的通用 CLI 适配器接入。
+## Requirements
 
-## v0.2.0 更新亮点
+- Blender 4.2 or newer (tested on 5.3).
+- Python 3.9+ for the installer / bridge launcher (Blender's bundled Python also works).
+- [CodeBuddy CLI](https://www.codebuddy.ai/) installed and logged in.
+- Windows, Linux or macOS. Paths are detected automatically.
 
-- **通用本地 agent 适配器**：不再绑定 CodeBuddy CLI。通过 `command_template` 可接入 Claude Code、Cursor CLI 或任何能从命令行调用、按约定格式输出的本地 agent。
-- **CodeBuddy CLI 一键安装**：安装器加 `--install-cli` 即可调用官方安装脚本；Windows 用户也可双击 `install_cli.bat`。首次登录仍需用户自己完成。
-- **避免命令行长度限制**：完整提示词写入 `prompt.txt` 再交给 agent，彻底绕开 Windows 的命令行长度上限。
-- **纯文本输出模式**：`output_format: text` 支持不提供流式事件的 agent，同样能拆成多步执行。
-- **稳定性修复**：心跳改为独立线程，模型长时间生成时不再误报离线；单实例锁防止重复启动桥接。
-- **可滚动对话面板**：固定 5 行高度，最多保留 200 条消息，越用越长的问题彻底解决。
-- **完整包结构**：安装脚本、卸载脚本、Blender Extension manifest、README、MIT 许可、单元测试和 GitHub Actions CI 一应俱全。
+## Install
 
-## 功能一览
-
-- 自然语言指令控制 Blender：建模、网格编辑、材质节点、灯光相机、动画、场景设置等
-- 边思考边执行：模型每输出一个 `# 思考:` + `python` 代码块，Blender 立刻应用一步
-- 实时进度流：桥接控制台和侧栏对话区都能看到模型的思考与操作
-- 连接状态指示灯：基于每秒写入的心跳文件判断是否在线
-- 场景上下文自动附带：选中物体、整场景物体清单、材质、集合、视口截图
-- 每步独立 undo，改错一键 Ctrl+Z
-
-## 环境要求
-
-- Blender 4.2 或更高版本（已在 5.3 上测试）
-- Python 3.9+（用于安装器和桥接启动器；Blender 自带 Python 也可）
-- 一个已登录的本地 agent CLI，例如 CodeBuddy CLI；其他 agent 也可通过配置接入
-- Windows / macOS / Linux
-
-## 快速开始
+### Option A — installer script (recommended)
 
 ```bash
-python install.py --install-cli    # 安装插件，并自动安装 CodeBuddy CLI（可选）
+python install.py                 # install into all detected Blender versions
+python install.py --version 4.2   # install into one version
+python install.py --install-cli   # also install CodeBuddy CLI if it is missing
 ```
 
-或者在 Blender 里通过 **Edit > Preferences > Add-ons > Install from Disk** 安装本压缩包。
+The installer copies the addon into your Blender user scripts directory, writes `bridge/config.json` from the example, and records the bridge script path. With `--install-cli` it runs the official CodeBuddy CLI installer for your platform. On Windows you can also double-click `install_cli.bat`.
 
-首次使用：
+> CLI installation can be automated, but the first login cannot. After installation, run `codebuddy` once in a terminal and complete the site/OAuth login shown by the CLI.
 
-1. 在终端运行一次 `codebuddy`，完成登录（仅首次）
-2. 在 Blender 侧栏打开 **Agent Console**
-3. 点击 **Start / Restart** 启动桥接，或运行 `python start_bridge.py`
-4. 选中物体，输入一句中文指令，点击 **Send**
+Then in Blender: **Edit > Preferences > Add-ons > Enable "Agent Console"**.
 
-示例指令：
+### Option B — Blender Extension zip
 
-- 生成一个红色立方体，放在坐标 (2,0,0)，再加一个倒角修改器
-- 把场景里所有灯光删掉
-- 给中间的模型做一个金属质感的材质
+Zip this whole package directory (including `blender_manifest.toml`, `addon/` and `bridge/`) and install it through **Edit > Preferences > Add-ons > Install from Disk**. Keep the `bridge/` folder in a stable location and set **Bridge Service Script** in the addon preferences to `<extracted>/bridge/agent_bridge.py`.
 
-## 使用其他 agent
+## Run
 
-编辑 `bridge/config.json`：
+1. Start the bridge:
+
+   ```bash
+   python start_bridge.py          # or double-click start_bridge.bat on Windows
+   ```
+
+   Or click **Start / Restart** in the addon panel — it launches the bridge with Blender's own Python in a new console window.
+
+2. In Blender, open the **Agent Console** tab in the 3D-view sidebar.
+3. Select objects if relevant, type a message, and click **Send**.
+4. Watch the chat list: thinking text appears live, then each step is applied one by one.
+5. Something wrong? `Ctrl+Z` in Blender undoes the last step.
+
+Useful bridge commands:
+
+```bash
+python start_bridge.py --doctor     # check CLI, config, addon and a tiny model call
+python start_bridge.py --selftest   # simulate one request without Blender
+python start_bridge.py --once       # process one pending request and exit
+```
+
+## Configuration
+
+`bridge/config.json` is created from `config.example.json` on first install. Leave a field empty to auto-detect it.
+
+| Field | Meaning |
+| --- | --- |
+| `shared_dir` | Directory for `request.json`, `steps.json`, `progress.json`, `heartbeat.json`. Defaults to the addon bridge directory of your Blender version. |
+| `blender_version` | Blender config folder such as `4.2`. Auto-detected if empty. |
+| `cli.command` | CodeBuddy CLI command. Empty means auto-discover on PATH and in `.workbuddy`. |
+| `cli.model` | Optional model override. |
+| `cli.timeout` | Seconds allowed for one model call. |
+| `cli.system_prompt_file` | Path to the prompt rules; relative paths resolve next to `agent_bridge.py`. |
+| `agent.provider` | `codebuddy` (default) or `generic`. |
+| `agent.command_template` | Command used when provider is `generic`. Supports `{prompt_file}`, `{system_prompt_file}` and `{shared_dir}`. |
+| `agent.output_format` | `stream-json` (CodeBuddy-style events) or `text` (plain stdout). |
+| `agent.stdin_mode` | `none` or `prompt` (send the full prompt on stdin). |
+
+### Using a different local agent
+
+The bridge is not tied to CodeBuddy. Set `agent.provider` to `generic` and give it a command template. The full prompt is written to `prompt.txt` in the shared directory so it never exceeds the Windows command-line limit:
 
 ```json
 {
@@ -74,27 +97,51 @@ python install.py --install-cli    # 安装插件，并自动安装 CodeBuddy CL
 }
 ```
 
-只要对方 agent 按 `# 思考:` + python 代码块的协议输出，就能逐步执行。`stream-json` 模式可复用 CodeBuddy 的流式事件格式。
+If your agent reads prompts from stdin instead, use `\"stdin_mode\": \"prompt\"` and put only flags in the template. Any agent can be used as long as it follows the output protocol: a `# 思考:` line followed by a ```python code block for each step. `output_format: "text"` works for agents that print plain text; `stream-json` understands the CodeBuddy event stream format for live reasoning display.
 
-## 安全与隐私
+## How it works
 
-- 本插件会生成并执行任意 `bpy` 代码，不是沙箱环境。建议只在副本或已备份的工程上使用。
-- 场景数据、视口截图会发送给所配置的模型服务，请勿用于保密项目。
-- 每次操作都有独立撤销点；出错时 Ctrl+Z 即可回退。
-- 桥接拦截常见危险调用，但这是防护栏而非安全边界。
+```text
+Blender addon  --writes-->  shared/request.json
+      ^                         |
+      |                    bridge service
+      |                         |  streams CLI output
+      |                         v
+      |                    shared/steps.json  (one patch per completed code block)
+      |                         |
+      +-------- polls ----------+
 
-## 已知限制
+Chat/progress updates are written to shared/progress.json.
+A daemon thread writes shared/heartbeat.json every second.
+```
 
-- 目前适配的是命令行 agent，不直接支持 GUI-only 的 agent。
-- 流式思考可视化需要 agent 输出兼容的流式事件；普通文本 agent 只能看到分步结果。
-- 自然语言理解质量取决于所接 agent 的模型能力，复杂任务建议拆成多条指令。
+The addon applies new entries in `steps.json` as soon as they appear, so you do not wait for the whole answer before Blender starts changing.
 
-## 反馈
+## Safety and privacy
 
-遇到问题请提交 Issue，并附上：
+- Generated code is **not sandboxed**. The bridge blocks a small list of dangerous calls (`os.system`, `subprocess`, `open`, `eval`, `exec`, etc.), but this is a guardrail, not a security boundary.
+- Scene data and a viewport screenshot are sent to CodeBuddy CLI and therefore to the configured model provider. Do not use on confidential scenes.
+- Every step pushes an undo entry. Review results and keep backups.
+- The addon preference **Auto Apply** can be disabled to inspect patches before applying.
 
-- 操作系统、Blender 版本、agent 类型
-- `bridge.log` 的最后 50 行
-- `result.json` 和 `progress.json` 的内容
+## Troubleshooting
 
-感谢试用与反馈！
+| Symptom | Check |
+| --- | --- |
+| Panel says "bridge offline" | Only one `agent_bridge.py` process should run; check `heartbeat.json` timestamp. |
+| `path too long` error | Prompts must be passed via stdin, never as command-line arguments. This is already how the bridge works. |
+| "not logged in" | Run `codebuddy` in a terminal and finish the login flow. |
+| No steps appear | Run `--selftest` and inspect `bridge.log` and `progress.json`. |
+| Addon not visible | Enable it in Blender preferences; check the installed path printed by `install.py`. |
+
+## Uninstall
+
+```bash
+python install.py --uninstall
+```
+
+Remove the extracted bridge folder and `bridge/config.json` if you no longer need them.
+
+## License
+
+MIT — see `LICENSE`.
